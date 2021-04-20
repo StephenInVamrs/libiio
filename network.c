@@ -199,9 +199,8 @@ static int do_connect(int fd, const struct addrinfo *addrinfo,
 	return 0;
 }
 
-int create_socket(const struct addrinfo *addrinfo)
+int create_socket(const struct addrinfo *addrinfo, unsigned int timeout)
 {
-	const unsigned int timeout = DEFAULT_TIMEOUT_MS;
 	int ret, fd, yes = 1;
 
 	fd = do_create_socket(addrinfo);
@@ -295,7 +294,7 @@ static int network_open(const struct iio_device *dev,
 	if (ppdata->io_ctx.fd >= 0)
 		goto out_mutex_unlock;
 
-	ret = create_socket(pdata->addrinfo);
+	ret = create_socket(pdata->addrinfo, DEFAULT_TIMEOUT_MS);
 	if (ret < 0) {
 		IIO_ERROR("Create socket: %d\n", ret);
 		goto out_mutex_unlock;
@@ -999,8 +998,8 @@ struct iio_context * network_create_context(const struct iio_context_params *par
 	struct iio_context *ctx;
 	struct iiod_client *iiod_client;
 	struct iio_context_pdata *pdata;
+	unsigned int i, timeout_ms = DEFAULT_TIMEOUT_MS;
 	size_t uri_len;
-	unsigned int i;
 	int fd, ret;
 	char *description, *uri;
 #ifdef _WIN32
@@ -1076,7 +1075,7 @@ struct iio_context * network_create_context(const struct iio_context_params *par
 		return NULL;
 	}
 
-	fd = create_socket(res);
+	fd = create_socket(res, timeout_ms);
 	if (fd < 0) {
 		errno = -fd;
 		goto err_free_addrinfo;
@@ -1099,7 +1098,7 @@ struct iio_context * network_create_context(const struct iio_context_params *par
 	pdata->iiod_client = iiod_client;
 	pdata->io_ctx.fd = fd;
 	pdata->addrinfo = res;
-	pdata->io_ctx.timeout_ms = DEFAULT_TIMEOUT_MS;
+	pdata->io_ctx.timeout_ms = timeout_ms;
 
 	pdata->msg_trunc_supported = msg_trunc_supported(&pdata->io_ctx);
 	if (pdata->msg_trunc_supported)
@@ -1153,7 +1152,7 @@ struct iio_context * network_create_context(const struct iio_context_params *par
 		}
 
 		dev->pdata->io_ctx.fd = -1;
-		dev->pdata->io_ctx.timeout_ms = DEFAULT_TIMEOUT_MS;
+		dev->pdata->io_ctx.timeout_ms = timeout_ms;
 #ifdef WITH_NETWORK_GET_BUFFER
 		dev->pdata->memfd = -1;
 #endif
@@ -1185,7 +1184,7 @@ struct iio_context * network_create_context(const struct iio_context_params *par
 
 	free(uri);
 	iiod_client_set_timeout(pdata->iiod_client, &pdata->io_ctx,
-			calculate_remote_timeout(DEFAULT_TIMEOUT_MS));
+			calculate_remote_timeout(timeout_ms));
 	return ctx;
 
 err_free_uri:
